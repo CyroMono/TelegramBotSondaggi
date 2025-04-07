@@ -16,7 +16,7 @@ TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 # === GOOGLE SHEETS ===
 scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 
-google_credentials_json = os.getenv('GOOGLE_CREDENTIALS')
+google_credentials_json = os.getenv("GOOGLE_CREDENTIALS")
 
 if google_credentials_json:
     # Carica il contenuto JSON come dizionario
