@@ -47,15 +47,13 @@ def cerca_immagine(query):
 
     resp = requests.get(url, headers=headers)
     soup = BeautifulSoup(resp.text, "html.parser")
-
-    # Cerca immagini nella struttura HTML di Bing
     image_elements = soup.find_all("a", class_="iusc")
 
     for element in image_elements:
         m = element.get("m")
         if m:
             try:
-                data = eval(m)  # contiene JSON-like con info immagine
+                data = eval(m)
                 if "murl" in data:
                     return data["murl"]
             except:
@@ -63,19 +61,24 @@ def cerca_immagine(query):
 
     return None
 
-async def new_round(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def new_round(update: Update = None, context: ContextTypes.DEFAULT_TYPE = None):
     global current_poll_id, poll_message_id, poll_chat_id, poll_options, poll_votes, poll_row
 
     # Recupera i dati dalla riga corrente
     row = sheet.row_values(poll_row)
     if len(row) < 2 or not row[0] or not row[1]:
-        await update.message.reply_text("Nessuna opzione disponibile. Usa /start per ripartire.")
+        if update:
+            await update.message.reply_text("Nessuna opzione disponibile. Usa /start per ripartire.")
         return
 
     option1, option2 = row[0], row[1]
     poll_options = [option1, option2]
     poll_votes = [0, 0]
-    poll_chat_id = update.effective_chat.id
+
+    # Imposta poll_chat_id solo se update è disponibile
+    if update:
+        poll_chat_id = update.effective_chat.id
 
     # immagini
     url1 = cerca_immagine(option1)
@@ -104,6 +107,7 @@ async def new_round(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Fissa il sondaggio nel gruppo
     await context.bot.pin_message(chat_id=poll_chat_id, message_id=poll_message_id)
 
+
 async def receive_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global poll_votes, poll_options, poll_row, current_poll_id
 
@@ -118,23 +122,29 @@ async def receive_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
         winner = poll_options[selected]
         await context.bot.stop_poll(poll_chat_id, poll_message_id)
         sheet.update_cell(poll_row, 3, winner)
-        await context.bot.send_message(chat_id=poll_chat_id, text=f"🏆 Vince: {winner}!\nProssimo round...")
+        await context.bot.send_message(
+            chat_id=poll_chat_id,
+            text=f"🏆 Vince: {winner} con {poll_votes[selected]} voti contro i {poll_votes[1 - selected]} voti di {poll_options[1 - selected]} !\nProssimo round..."
+        )
         poll_row += 1
-        await new_round(update, context)
+        await new_round(update=None, context=context)  # update=None è importante
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global poll_row
+    global poll_row, poll_chat_id
     poll_row = 2
+    poll_chat_id = update.effective_chat.id
 
     # Cerca la prima riga vuota nella colonna dei vincitori (colonna 3)
     while True:
         winner = sheet.cell(poll_row, 3).value
-        if not winner:  # Se la cella del vincitore è vuota
-            break  # Trova la prima riga con il vincitore vuoto
-        poll_row += 1  # Se la cella del vincitore non è vuota, passa alla riga successiva
+        if not winner:
+            break
+        poll_row += 1
 
     await update.message.reply_text(f"🔁 Riparto dalla riga {poll_row}.")
     await new_round(update, context)
+
 
 async def main():
     logging.basicConfig(level=logging.INFO)
@@ -146,6 +156,7 @@ async def main():
 
     print("✅ Bot avviato.")
     await app.run_polling()
+
 
 if __name__ == '__main__':
     import asyncio
